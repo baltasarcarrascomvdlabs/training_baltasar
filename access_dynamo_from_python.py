@@ -9,8 +9,8 @@ Function for retrieving an attribute from a RDS database that is used as
 foreign key in another DynamoDb database, and then retrieving the item 
 from the DynamoDb database.
 
-This could be done using the event lambda_handler receives, i did it this
-instead in order to show you the keys and parameters used.
+This could be done using the event lambda_handler receives, I did it this
+way instead, in order to show you the keys and parameters used.
 '''
 
 def lambda_handler(event, context):
