@@ -1,0 +1,112 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Metadata": {
+        "AWS::CloudFormation::Designer": {
+            "602e5a05-f228-4508-b2ad-35bc1bbb8899": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 320,
+                    "y": 140
+                },
+                "z": 0
+            },
+            "ff8569db-9e0b-440e-bd0b-21c0c0706b9e": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 447,
+                    "y": 145
+                },
+                "z": 0
+            }
+        }
+    },
+    "Resources": {
+        "LF2KP5Z": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Role" : {
+                    "Fn::GetAtt": [
+                      "LambdaExecutionRole",
+                      "Arn"
+                    ]
+                  },
+                "Runtime" : "python3.9",
+                "Code" : {"ZipFile": {
+                    "Fn::Join" : [
+                      "\n", [
+                        "def handler(event, context):",
+                        "    print(\"Hello world!\")"
+                      ]
+                    ]
+                  }
+                },
+                "FunctionName": "hello-world-python",
+                "Handler" : "index.handler"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "602e5a05-f228-4508-b2ad-35bc1bbb8899"
+                }
+            }
+        },
+        "S3B3RG3B": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+               "BucketName" : "bucket-test-baltasar-cloudformation"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "ff8569db-9e0b-440e-bd0b-21c0c0706b9e"
+                }
+            }
+        },
+        "LambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+              "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": [
+                        "glue.amazonaws.com",
+                        "s3.amazonaws.com",
+                        "lambda.amazonaws.com"
+                      ]
+                    },
+                    "Action": [
+                      "sts:AssumeRole"
+                    ]
+                  }
+                ]
+              },
+              "Path": "/",
+              "Policies": [
+                {
+                  "PolicyName": "root",
+                  "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "glue:*",
+                          "s3:*"
+                        ],
+                        "Resource": "*"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+        }
+    }
+}
