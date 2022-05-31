@@ -27,7 +27,7 @@
         }
     },
     "Resources": {
-        "LF2KP5Z": {
+        "LambdaFunction": {
             "Type": "AWS::Lambda::Function",
             "Properties": {
                 "Role" : {
@@ -55,7 +55,7 @@
                 }
             }
         },
-        "S3B3RG3B": {
+        "S3Bucket": {
             "Type": "AWS::S3::Bucket",
             "Properties": {
                "BucketName" : "bucket-test-baltasar-cloudformation"
