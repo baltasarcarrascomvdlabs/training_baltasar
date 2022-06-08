@@ -1,0 +1,287 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description:
+  This template deploys VPC and the required roles and to run the EMR cluster. Also it creates the lambda function to run the spark job querying the weather database.
+
+Parameters:
+  VPCName:
+    Type: String
+    Default: EMVPC
+
+  VpcCIDR:
+    Type: String
+    Default: 10.192.0.0/16
+
+  PublicSubnet1CIDR:
+    Type: String
+    Default: 10.192.10.0/24
+
+  PrivateSubnet1CIDR:
+    Type: String
+    Default: 10.192.20.0/24
+
+Resources:
+    VPC:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: !Ref VpcCIDR
+        EnableDnsSupport: true
+        EnableDnsHostnames: true
+        Tags:
+          - Key: Name
+            Value: !Ref VPCName
+      
+    InternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Ref VPCName
+
+    InternetGatewayAttachment:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        InternetGatewayId: !Ref InternetGateway
+        VpcId: !Ref VPC
+
+    PublicSubnet1:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref VPC
+        AvailabilityZone: !Select [ 0, !GetAZs '' ]
+        CidrBlock: !Ref PublicSubnet1CIDR
+        MapPublicIpOnLaunch: true
+        Tags:
+          - Key: Name
+            Value: !Sub ${VPCName} Public Subnet 
+    
+    PrivateSubnet1:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref VPC
+        AvailabilityZone: !Select [ 0, !GetAZs '' ]
+        CidrBlock: !Ref PrivateSubnet1CIDR
+        MapPublicIpOnLaunch: false
+        Tags:
+          - Key: Name
+            Value: !Sub ${VPCName} Private Subnet 
+    
+    NatGatewayEIP:
+      Type: AWS::EC2::EIP
+      DependsOn: InternetGatewayAttachment
+      Properties:
+        Domain: vpc
+
+    NatGateway:
+      Type: AWS::EC2::NatGateway
+      Properties:
+        AllocationId: !GetAtt NatGatewayEIP.AllocationId
+        SubnetId: !Ref PublicSubnet1
+    
+    PublicRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref VPC
+        Tags:
+          - Key: Name
+            Value: !Sub ${VPCName} Public Route Table
+
+    DefaultPublicRoute:
+      Type: AWS::EC2::Route
+      DependsOn: InternetGatewayAttachment
+      Properties:
+        RouteTableId: !Ref PublicRouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref InternetGateway
+
+    PublicSubnet1RouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PublicRouteTable
+        SubnetId: !Ref PublicSubnet1
+
+    PrivateRouteTable1:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref VPC
+        Tags:
+          - Key: Name
+            Value: !Sub ${VPCName} Private Routes (AZ1)
+
+    DefaultPrivateRoute1:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref PrivateRouteTable1
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId: !Ref NatGateway
+
+    PrivateSubnet1RouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PrivateRouteTable1
+        SubnetId: !Ref PrivateSubnet1
+
+    SecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        VpcId: !Ref VPC
+        GroupDescription: Security group
+
+
+    SecurityGroupIngress:
+      Type: 'AWS::EC2::SecurityGroupIngress'
+      Properties:
+        GroupId: !GetAtt SecurityGroup.GroupId
+        IpProtocol: '-1'
+        SourceSecurityGroupId: !Ref SecurityGroup    
+
+    SecurityGroupEgress:
+      Type: 'AWS::EC2::SecurityGroupEgress'
+      Properties:
+        GroupId: !GetAtt SecurityGroup.GroupId
+        IpProtocol: '-1'
+        CidrIp: 0.0.0.0/0
+
+    LambdaEMRExecutionRole: 
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+            - Action:
+              - sts:AssumeRole
+              Effect: Allow
+              Principal:
+                Service:
+                - lambda.amazonaws.com
+          Version: 2012-10-17
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/AWSLambdaExecute
+          - arn:aws:iam::aws:policy/AmazonElasticMapReduceFullAccess
+          - arn:aws:iam::aws:policy/AmazonAthenaFullAccess
+          - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        Policies:
+          - PolicyName: AccessSecretsManager
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: secretsmanager:GetSecretValue
+                  Resource: arn:aws:secretsmanager:us-east-1:095585830284:secret:secret-key-baltasar-VeYczp
+          - PolicyName: DescribeStacks
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: cloudformation:DescribeStacks
+                  Resource : '*'
+
+    LambdaAPIExecutionRole: 
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+            - Action:
+              - sts:AssumeRole
+              Effect: Allow
+              Principal:
+                Service:
+                - lambda.amazonaws.com
+          Version: 2012-10-17
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/AWSLambdaExecute
+        Policies:
+          - PolicyName: GetObjects
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: s3:GetObject
+                  Resource: '*'
+          - PolicyName: ListBucket
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: s3:ListBucket
+                  Resource: arn:aws:s3:::emr-test-bucket-baltasar
+
+    LambdaFunction: 
+        Type: AWS::Lambda::Function
+        Properties: 
+            Handler: lambda_spark_job.lambda_handler
+            Role : !GetAtt LambdaEMRExecutionRole.Arn
+            Runtime : python3.9
+            Code : 
+                  S3Bucket: emr-test-bucket-baltasar
+                  S3Key: lambda_spark_job.py.zip
+            FunctionName: "spark_job"
+
+    LambdaAPIFunction: 
+        Type: AWS::Lambda::Function
+        Properties: 
+            Handler: api_server_temperature.lambda_handler
+            Role : !GetAtt LambdaAPIExecutionRole.Arn
+            Runtime : python3.9
+            Code : 
+                  S3Bucket: emr-test-bucket-baltasar
+                  S3Key: api_server_temperature.py.zip
+            FunctionName: "temperature_api"
+
+    EMRRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: 2008-10-17
+          Statement:
+            - Sid: ''
+              Effect: Allow
+              Principal:
+                Service: elasticmapreduce.amazonaws.com
+              Action: 'sts:AssumeRole'
+        Path: /
+        ManagedPolicyArns:
+          - 'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceRole'
+    
+    EMREC2Role:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: 2008-10-17
+          Statement:
+            - Sid: ''
+              Effect: Allow
+              Principal:
+                Service: ec2.amazonaws.com
+              Action: 'sts:AssumeRole'
+        Path: /
+        ManagedPolicyArns:
+          - 'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceforEC2Role'
+      
+    EMREC2InstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        Path: /
+        Roles:
+          - !Ref EMREC2Role
+
+Outputs:
+  LambdaExecutionRole: 
+    Description: Lambda role
+    Value: !Ref LambdaEMRExecutionRole
+
+  ServiceRole: 
+    Description: EMR role name
+    Value: !GetAtt EMRRole.Arn
+
+  JobFlowRole: 
+    Description: EC2 role name
+    Value:  !GetAtt EMREC2InstanceProfile.Arn
+
+  Ec2SubnetId: 
+    Description: Private subnet ID for EMR
+    Value: !Ref PrivateSubnet1
+
+  LambdaFunction:
+    Description: Lambda function for spark job
+    Value: !Ref LambdaFunction
+
