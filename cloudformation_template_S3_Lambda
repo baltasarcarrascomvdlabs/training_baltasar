@@ -1,0 +1,66 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Metadata": {
+    },
+    "Resources": {
+        "LambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Role" : {
+                    "Fn::GetAtt": [
+                      "LambdaExecutionRole",
+                      "Arn"
+                    ]
+                  },
+                "Runtime" : "python3.9",
+                "Code" : {"ZipFile": {
+                    "Fn::Join" : [
+                      "\n", [
+                        "def handler(event, context):",
+                        "    print(\"Hello world!\")"
+                      ]
+                    ]
+                  }
+                },
+                "FunctionName": "hello-world-python",
+                "Handler" : "index.handler"
+            },
+            "Metadata": {
+            }
+        },
+        "S3Bucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+               "BucketName" : "bucket-test-baltasar-cloudformation"
+            },
+            "Metadata": {
+            }
+        },
+        "LambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+              "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": [
+                        "glue.amazonaws.com",
+                        "s3.amazonaws.com",
+                        "lambda.amazonaws.com"
+                      ]
+                    },
+                    "Action": [
+                      "sts:AssumeRole"
+                    ]
+                  }
+                ]
+              },
+              "Path": "/",
+              "Policies": [
+              ]
+            }
+        }
+    }
+}
