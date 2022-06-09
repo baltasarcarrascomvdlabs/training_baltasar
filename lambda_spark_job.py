@@ -5,11 +5,17 @@ import base64
 client = boto3.client('emr')
 region_name = "us-east-1"
 
-'''
-Funciton for retrieving secret key from SecretsManager service
-'''
-
 def get_secret():
+    '''
+    Function for retrieving secret key from SecretsManager service
+
+    Parameters:
+        None
+
+    Returns:
+        JSON: secret_json
+    '''
+
     secret_name = "secret-key-baltasar"
     session = boto3.session.Session()
     client = session.client(service_name='secretsmanager', region_name=region_name)
@@ -18,14 +24,21 @@ def get_secret():
             secret = get_secret_value_response['SecretString']
     else:
             secret = base64.b64decode(get_secret_value_response['SecretBinary'])
-    return json.loads(secret)
-    
-'''
-Function for retrieving stack outputs in order to use them as arguments in the EMR cluster
-'''
+    secret_json = json.loads(secret)
+    return secret_json
     
 def get_outputs():
-    cloudformationf_client = boto3.client('cloudformation')
+    '''
+    Function for retrieving stack outputs in order to use them as arguments in the EMR cluster
+
+    Parameters:
+        None
+
+    Returns:
+        (String, String, String): retrieved_outputs
+    '''
+
+    cloudformation_client = boto3.client('cloudformation')
     stackname = 'ramp-up-baltasar'
     response = cloudformation_client.describe_stacks(StackName=stackname)
     outputs = response["Stacks"][0]["Outputs"]
@@ -37,13 +50,21 @@ def get_outputs():
             JobFlowRole = output["OutputValue"]
         if keyName == "Ec2SubnetId":
             Ec2SubnetId = output["OutputValue"]
-    return (ServiceRole, JobFlowRole, Ec2SubnetId)
-
-'''
-Function for running an EMR cluster to excecute a Spark job. The cluster is terminated when the job ends
-'''
+    retrieved_outputs = (ServiceRole, JobFlowRole, Ec2SubnetId)
+    return retrieved_outputs
 
 def lambda_handler(event, context):
+    '''
+    Function for running an EMR cluster to excecute a Spark job. The cluster is terminated when the job ends
+
+    Parameters:
+        context: Not used 
+        event: Not used
+
+    Returns:
+        None
+    '''
+
     secret = get_secret()
     (ServiceRole, JobFlowRole, Ec2SubnetId) = get_outputs()
     response = client.run_job_flow(
